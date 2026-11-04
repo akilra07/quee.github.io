@@ -1,0 +1,640 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Pila | Office Queueing System</title>
+<style>
+:root{
+  --ink:#132A3D; --ink-soft:#3B5164; --paper:#F7F5F0; --card:#FFFFFF;
+  --line:#D8D2C4; --accent:#D98A2B; --accent-ink:#4A2E0A;
+  --serve:#2F6E4E; --serve-bg:#E6F0E9; --wait-bg:#FBEEDD; --danger:#B23A2E;
+}
+*{box-sizing:border-box;}
+body{
+  margin:0; background:var(--paper); color:var(--ink);
+  font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+}
+header{position:sticky; top:0; z-index:5; background:var(--paper); padding:16px 16px 0; border-bottom:1px solid var(--line);}
+.brand{display:flex; align-items:baseline; gap:8px; margin-bottom:12px;}
+.brand b{font-size:1.15rem;} .brand span{color:var(--ink-soft); font-size:0.85rem;}
+.brand .clock{margin-left:auto; font-variant-numeric:tabular-nums; font-weight:600; color:var(--ink);}
+nav{display:flex; gap:4px; max-width:760px; margin:0 auto;}
+nav button{flex:1; background:none; border:none; color:var(--ink-soft); font-size:0.92rem; padding:10px 4px 12px; cursor:pointer; border-bottom:2px solid transparent;}
+nav button.active{color:var(--ink); border-bottom-color:var(--accent); font-weight:600;}
+main{max-width:760px; margin:0 auto; padding:22px 16px 60px;}
+.view{display:none;} .view.active{display:block;}
+.hidden{display:none !important;}
+h1{font-size:1.4rem; margin:0 0 4px;} h2{font-size:1.1rem; margin:0 0 4px;}
+.sub{color:var(--ink-soft); font-size:0.92rem; margin:0 0 18px;}
+.card{background:var(--card); border:1px solid var(--line); border-radius:12px; padding:20px; margin-top:16px;}
+.office-grid{display:grid; grid-template-columns:1fr; gap:12px;}
+@media(min-width:560px){.office-grid{grid-template-columns:1fr 1fr 1fr;}}
+.office-card{background:var(--card); border:1px solid var(--line); border-radius:10px; padding:18px; text-align:left; cursor:pointer; color:var(--ink);}
+.office-card:hover{border-color:var(--accent);}
+.office-card .name{font-weight:600; font-size:1.05rem; display:block;}
+.office-card .count{color:var(--ink-soft); font-size:0.85rem; margin-top:6px; display:block;}
+.tx-list{display:flex; flex-direction:column; gap:8px; margin-bottom:16px;}
+.tx-list button{padding:12px; text-align:left; border-radius:8px; border:1px solid var(--line); background:var(--paper); cursor:pointer; font-size:0.95rem; color:var(--ink);}
+.tx-list button.sel{border-color:var(--accent); background:var(--wait-bg); font-weight:600;}
+.field-label{font-size:0.82rem; color:var(--ink-soft); display:block; margin-bottom:6px;}
+input[type=text],input[type=password]{width:100%; padding:12px; border:1px solid var(--line); border-radius:9px; background:var(--card); color:var(--ink); font-size:1rem; margin-bottom:12px;}
+.row-actions{display:flex; gap:10px; margin-top:6px;}
+.btn{padding:12px 20px; border-radius:9px; border:none; background:var(--ink); color:var(--paper); font-size:0.95rem; font-weight:600; cursor:pointer;}
+.btn:disabled{opacity:.4; cursor:not-allowed;}
+.btn.outline{background:none; border:1px solid var(--line); color:var(--ink); font-weight:500;}
+.ticket{background:var(--card); border:1px dashed var(--accent); border-radius:12px; padding:28px 20px; text-align:center; margin-top:20px;}
+.ticket .label{color:var(--ink-soft); font-size:0.85rem; text-transform:uppercase; letter-spacing:.06em;}
+.ticket .num{font-size:3.2rem; font-weight:700; margin:6px 0; color:var(--accent-ink); background:var(--accent); border-radius:8px; display:inline-block; padding:4px 24px;}
+.ticket .office{margin-top:8px; font-weight:600;}
+.ticket .note{color:var(--ink-soft); font-size:0.85rem; margin-top:10px;}
+.error{color:var(--danger); font-size:0.85rem; margin:-4px 0 10px;}
+.hint{color:var(--ink-soft); font-size:0.8rem; margin-top:14px;}
+.dash-head{display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:18px;}
+.now-serving{background:var(--serve-bg); border-radius:12px; padding:24px; text-align:center; margin-bottom:16px;}
+.now-serving .label{color:var(--serve); font-size:0.85rem; text-transform:uppercase; letter-spacing:.06em;}
+.now-serving .num{font-size:3.2rem; font-weight:700; color:var(--serve); margin:4px 0;}
+.tx-tag{color:var(--ink-soft); font-size:0.85rem;}
+.waitlist{list-style:none; padding:0; margin:0;}
+.waitlist li{display:flex; justify-content:space-between; padding:10px 4px; border-bottom:1px solid var(--line); font-size:0.95rem;}
+.waitlist li:first-child{font-weight:600;}
+.empty{color:var(--ink-soft); font-size:0.9rem; padding:10px 0;}
+.board{display:grid; grid-template-columns:1fr; gap:14px;}
+@media(min-width:560px){.board{grid-template-columns:1fr 1fr 1fr;}}
+.board-card{background:var(--card); border:1px solid var(--line); border-radius:12px; padding:20px; text-align:center;}
+.board-card .office{font-weight:600; margin-bottom:10px;}
+.board-card .num{font-size:2.4rem; font-weight:700; color:var(--serve);}
+.board-card .waiting{color:var(--ink-soft); font-size:0.85rem; margin-top:6px;}
+.status{font-size:0.85rem; color:var(--ink-soft); margin-top:24px; text-align:center;}
+.alert-banner{background:var(--serve); color:#fff; border-radius:10px; padding:16px 18px; margin-top:16px; display:flex; justify-content:space-between; align-items:center; gap:12px; font-weight:600;}
+.alert-banner.soon{background:var(--accent); color:var(--accent-ink);}
+.alert-banner.cancel{background:var(--danger); color:#fff;}
+.alert-banner button{background:rgba(255,255,255,.25); border:none; color:inherit; border-radius:7px; padding:6px 12px; cursor:pointer; font-weight:600; white-space:nowrap;}
+.alert-banner .msg{font-size:0.95rem;}
+.alert-banner .sub-msg{font-weight:400; font-size:0.82rem; margin-top:4px; opacity:.9;}
+
+</style>
+</head>
+<body>
+
+<header>
+  <div class="brand"><b>Pila</b><span>Registrar &middot; Clinic &middot; Cashier</span><span class="clock" id="live-clock"></span></div>
+  <nav>
+    <button data-view="kiosk" class="active">Get a Number</button>
+    <button data-view="staff">Staff Login</button>
+    <button data-view="display">Display Board</button>
+  </nav>
+</header>
+
+<main>
+
+  <!-- KIOSK -->
+  <section class="view active" id="v-kiosk">
+
+    <div id="student-login">
+      <h1>Student Login</h1>
+      <p class="sub">Please log in before getting a queue number.</p>
+      <input type="text" id="student-user" placeholder="Username">
+      <input type="password" id="student-pass" placeholder="Password">
+      <p class="error hidden" id="student-error">Incorrect username or password.</p>
+      <button class="btn" id="student-login-btn">Log In</button>
+      <p class="hint">Demo account: student / student123</p>
+    </div>
+
+    <div id="kiosk-content" class="hidden">
+      <div class="dash-head">
+        <div>
+          <h1>Get a Number</h1>
+          <p class="sub" id="student-welcome" style="margin:0;"></p>
+        </div>
+        <button class="btn outline" id="student-logout-btn">Log Out</button>
+      </div>
+      <p class="sub">Choose an office and your transaction.</p>
+      <div class="office-grid" id="kiosk-offices"></div>
+
+      <div id="transaction-step" class="card hidden">
+        <h2 id="tx-office-name"></h2>
+        <p class="sub" id="tx-est"></p>
+        <div class="tx-list" id="tx-list"></div>
+        <div id="tx-other-wrap" class="hidden">
+          <label class="field-label" for="tx-other">Describe what you need at this office</label>
+          <input type="text" id="tx-other" maxlength="120" placeholder="What would you like help with?">
+        </div>
+        <label class="field-label">Full Name</label>
+        <input type="text" id="tx-name" placeholder="Juan Dela Cruz">
+        <label class="field-label">Course / Program</label>
+        <input type="text" id="tx-course" placeholder="e.g. BS Information Technology">
+        <label class="field-label">Year &amp; Section</label>
+        <input type="text" id="tx-year" placeholder="e.g. 2nd Year - A">
+        <label class="field-label">Contact number (for the no-internet-needed SMS notification, simulated in this demo)</label>
+        <input type="text" id="tx-contact" placeholder="09xx xxx xxxx">
+        <div class="row-actions">
+          <button class="btn outline" id="tx-back">Back</button>
+          <button class="btn" id="tx-confirm" disabled>Get Number</button>
+        </div>
+      </div>
+
+      <div id="turn-alert" class="alert-banner hidden"></div>
+      <div id="ticket-slot"></div>
+    </div>
+  </section>
+
+  <!-- STAFF -->
+  <section class="view" id="v-staff">
+    <div id="staff-login">
+      <h1>Staff Login</h1>
+      <p class="sub">Use the account assigned to your office.</p>
+      <input type="text" id="login-user" placeholder="Username">
+      <input type="password" id="login-pass" placeholder="Password">
+      <p class="error hidden" id="login-error">Incorrect username or password.</p>
+      <button class="btn" id="login-btn">Log In</button>
+      <p class="hint">Demo accounts: registrar/registrar123, clinic/clinic123, cashier/cashier123, admin/admin123</p>
+    </div>
+
+    <div id="staff-dash" class="hidden">
+      <div class="dash-head">
+        <div>
+          <h1 id="dash-office"></h1>
+          <p class="sub" id="dash-name"></p>
+        </div>
+        <button class="btn outline" id="logout-btn">Log Out</button>
+      </div>
+
+      <div id="admin-board" class="board hidden"></div>
+
+      <div id="single-office-dash" class="hidden">
+        <div class="now-serving">
+          <div class="label">Now Serving</div>
+          <div class="num" id="now-num">&mdash;</div>
+          <div class="tx-tag" id="now-tx"></div>
+        </div>
+        <div class="row-actions">
+          <button class="btn" id="call-next" style="flex:1;">Call Next</button>
+          <button class="btn outline" id="call-batch">Call Next 5</button>
+        </div>
+        <button class="btn" id="no-show-notify" style="width:100%; margin-top:10px; background:var(--danger);" disabled>No student currently called</button>
+        <p class="sub" style="margin:18px 0 8px;">Waiting Queue</p>
+        <ul class="waitlist" id="wait-list"></ul>
+      </div>
+    </div>
+  </section>
+
+  <!-- DISPLAY -->
+  <section class="view" id="v-display">
+    <h1>Now Serving</h1>
+    <p class="sub">Live status of all three offices (updates automatically).</p>
+    <div class="board" id="display-board"></div>
+  </section>
+
+  <p class="status" id="conn-status">Local demo mode &mdash; data is saved in this browser only.</p>
+</main>
+
+<script>
+// ---- Hardcoded staff accounts (prototype only, no real backend) ----
+const CREDENTIALS = {
+  student:   { username: "student",   password: "student123",   label: "Student" },
+  registrar: { username: "registrar", password: "registrar123", label: "Registrar" },
+  clinic:    { username: "clinic",    password: "clinic123",    label: "Clinic" },
+  cashier:   { username: "cashier",   password: "cashier123",   label: "Cashier" },
+  admin:     { username: "admin",     password: "admin123",     label: "Admin (all offices)" }
+};
+
+// ---- Offices, their transaction types, and estimated minutes (based on citizen's charter / interview data) ----
+const OFFICES = [
+  { id:"registrar", name:"Registrar", transactions:[
+      {name:"Enrollment", mins:20}, {name:"Clearance Signing", mins:10},
+      {name:"Document Request", mins:15}, {name:"Scholarship Application", mins:20} ] },
+  { id:"clinic", name:"Clinic", transactions:[
+      {name:"Medical Consultation", mins:30}, {name:"Dental Consultation", mins:30},
+      {name:"Medical/Dental Clearance", mins:10} ] },
+  { id:"cashier", name:"Cashier", transactions:[
+      {name:"Tuition Payment", mins:10}, {name:"Miscellaneous Fees", mins:10},
+      {name:"Other Payment", mins:10} ] }
+];
+
+const STORAGE_KEY = "pila_queue_state_v1";
+const SESSION_KEY = "pila_staff_session_v1";
+const STUDENT_SESSION_KEY = "pila_student_session_v1";
+
+function emptyOffice(){ return { nowServing:null, nowTx:null, calledAt:null, lastIssued:0, lastCancelled:null, noShowPromptSent:false, studentResponse:null, queue:[] }; }
+
+function loadState(){
+  try{
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if(raw) return JSON.parse(raw);
+  }catch(e){}
+  const s = {};
+  OFFICES.forEach(o => s[o.id] = emptyOffice());
+  return s;
+}
+function saveState(){
+  try{ localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); }catch(e){}
+  render();
+}
+
+let state = loadState();
+let selectedOffice = null, selectedTx = null;
+let session = null; // { role, label }
+try{ const raw = sessionStorage.getItem(SESSION_KEY); if(raw) session = JSON.parse(raw); }catch(e){}
+let studentSession = null; // { username }
+try{ const raw = sessionStorage.getItem(STUDENT_SESSION_KEY); if(raw) studentSession = JSON.parse(raw); }catch(e){}
+
+// ---- Notifications: suggested by interviewees so students don't have to stand in line
+// (SMS/vibrate/on-screen alert instead of requiring constant internet/app use) ----
+const WATCH_KEY = "pila_watched_ticket_v1";
+let watchedTicket = null; // { officeId, number, officeName, notifiedSoon, notifiedTurn }
+try{ const raw = sessionStorage.getItem(WATCH_KEY); if(raw) watchedTicket = JSON.parse(raw); }catch(e){}
+function saveWatch(){ try{ sessionStorage.setItem(WATCH_KEY, JSON.stringify(watchedTicket)); }catch(e){} }
+
+function playBeep(times){
+  try{
+    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    for(let i=0;i<times;i++){
+      const o = ctx.createOscillator(), g = ctx.createGain();
+      o.connect(g); g.connect(ctx.destination);
+      o.frequency.value = 880; g.gain.value = 0.15;
+      const start = ctx.currentTime + i*0.35;
+      o.start(start); o.stop(start + 0.2);
+    }
+  }catch(e){}
+}
+function vibrate(pattern){ try{ if(navigator.vibrate) navigator.vibrate(pattern); }catch(e){} }
+function browserNotify(title, body){
+  try{
+    if(!("Notification" in window)) return;
+    if(Notification.permission === "granted") new Notification(title, { body });
+  }catch(e){}
+}
+function showBanner(kind, text, subText){
+  const el = document.getElementById("turn-alert");
+  el.className = "alert-banner " + (kind || "");
+  el.classList.remove("hidden");
+  el.innerHTML = `<div><div class="msg">${text}</div>${subText ? `<div class="sub-msg">${subText}</div>` : ""}</div><button id="alert-dismiss">Dismiss</button>`;
+  document.getElementById("alert-dismiss").onclick = () => el.classList.add("hidden");
+}
+const CALLED_PROMPT_MS = 30 * 1000;
+
+function cancelServingTicket(officeId, number){
+  const s = state[officeId];
+  if(!s || s.nowServing !== number) return;
+  s.lastCancelled = { number, at: Date.now() };
+  s.nowServing = null;
+  s.nowTx = null;
+  s.calledAt = null;
+  s.noShowPromptSent = false;
+  s.studentResponse = null;
+  saveState();
+}
+
+function showCalledPrompt(){
+  const el = document.getElementById("turn-alert");
+  el.className = "alert-banner soon";
+  el.classList.remove("hidden");
+  el.innerHTML = `
+    <div>
+      <div class="msg">The ${watchedTicket.officeName} office marked you as not present. Are you still coming?</div>
+      <div class="sub-msg">Choose whether to continue or cancel your number.</div>
+    </div>
+    <div style="display:flex; gap:8px;">
+      <button id="called-yes">Continue</button>
+      <button id="called-no">Cancel number</button>
+    </div>`;
+  document.getElementById("called-yes").onclick = () => {
+    watchedTicket.calledAwaitingResponse = false;
+    watchedTicket.calledConfirmed = true;
+    saveWatch();
+    const office = state[watchedTicket.officeId];
+    if(office && office.nowServing === watchedTicket.number){
+      office.studentResponse = "Student confirmed they are coming";
+      saveState();
+    }
+    showBanner("", "Thanks for confirming. Please proceed to " + watchedTicket.officeName + ".");
+  };
+  document.getElementById("called-no").onclick = () => {
+    cancelServingTicket(watchedTicket.officeId, watchedTicket.number);
+    watchedTicket.calledAwaitingResponse = false;
+    watchedTicket.cancelled = true;
+    saveWatch();
+    showBanner("cancel", "Your queue number was cancelled.", "The office has been notified. Please get a new number when you're ready to come back.");
+  };
+}
+
+function checkWatchedTicket(){
+  if(!watchedTicket || watchedTicket.cancelled) return;
+  const off = state[watchedTicket.officeId];
+  if(!off) return;
+
+  if(off.nowServing === watchedTicket.number && !watchedTicket.notifiedTurn){
+    showBanner("", `\uD83D\uDD14 It's your turn! Please proceed to ${watchedTicket.officeName} now.`);
+    playBeep(3); vibrate([200,100,200,100,200]);
+    browserNotify("It's your turn!", `Please proceed to ${watchedTicket.officeName}.`);
+    watchedTicket.notifiedTurn = true; saveWatch();
+    return;
+  }
+
+    if(off.nowServing === watchedTicket.number && off.noShowPromptSent && off.calledAt &&
+      Date.now() - off.calledAt >= CALLED_PROMPT_MS && !watchedTicket.calledPrompted){
+    watchedTicket.calledPrompted = true;
+    watchedTicket.calledAwaitingResponse = true;
+    saveWatch();
+    playBeep(2); vibrate([200,100,200]);
+    browserNotify("Office check-in", "Please open Pila to choose whether to continue or cancel your number.");
+    showCalledPrompt();
+    return;
+  }
+}
+
+// keep tabs in sync (this is a plain-file, no-backend demo: all tabs share one browser's storage)
+window.addEventListener("storage", e => { if(e.key === STORAGE_KEY) { state = loadState(); render(); } });
+
+// real-time refresh: re-read storage every second so open tabs (e.g. the Display Board on
+// a signage screen) update on their own without needing a manual page refresh
+setInterval(() => {
+  const fresh = JSON.stringify(loadState());
+  if(fresh !== JSON.stringify(state)){ state = JSON.parse(fresh); render(); }
+}, 1000);
+
+// live clock + elapsed-wait ticker
+function formatClock(d){
+  return d.toLocaleTimeString([], { hour: "2-digit", minute:"2-digit", second:"2-digit" });
+}
+function formatElapsed(ms){
+  const totalSec = Math.max(0, Math.floor(ms/1000));
+  const m = Math.floor(totalSec/60), s = totalSec%60;
+  return m > 0 ? `${m}m ${s}s` : `${s}s`;
+}
+setInterval(() => {
+  const clockEl = document.getElementById("live-clock");
+  if(clockEl) clockEl.textContent = formatClock(new Date());
+  renderStaff(); renderDisplay(); // refresh elapsed-time labels every second
+  checkWatchedTicket();
+}, 1000);
+
+// ---------------- Rendering ----------------
+function render(){ renderKioskGate(); renderKiosk(); renderStaff(); renderDisplay(); }
+
+function renderKioskGate(){
+  const loginBox = document.getElementById("student-login");
+  const content = document.getElementById("kiosk-content");
+  if(!studentSession){ loginBox.classList.remove("hidden"); content.classList.add("hidden"); return; }
+  loginBox.classList.add("hidden"); content.classList.remove("hidden");
+  document.getElementById("student-welcome").textContent = "Logged in as Student";
+}
+
+function studentLogin(){
+  const user = document.getElementById("student-user").value.trim();
+  const pass = document.getElementById("student-pass").value;
+  const errEl = document.getElementById("student-error");
+  const c = CREDENTIALS.student;
+  if(user !== c.username || pass !== c.password){ errEl.classList.remove("hidden"); return; }
+  errEl.classList.add("hidden");
+  studentSession = { username: user };
+  try{ sessionStorage.setItem(STUDENT_SESSION_KEY, JSON.stringify(studentSession)); }catch(e){}
+  render();
+}
+function studentLogout(){
+  studentSession = null;
+  try{ sessionStorage.removeItem(STUDENT_SESSION_KEY); }catch(e){}
+  document.getElementById("student-user").value = "";
+  document.getElementById("student-pass").value = "";
+  render();
+}
+
+function renderKiosk(){
+  const grid = document.getElementById("kiosk-offices");
+  grid.innerHTML = "";
+  OFFICES.forEach(o=>{
+    const s = state[o.id] || emptyOffice();
+    const btn = document.createElement("button");
+    btn.className = "office-card";
+    btn.innerHTML = `<span class="name">${o.name}</span><span class="count">${s.queue.length} waiting</span>`;
+    btn.onclick = () => openTransactionStep(o);
+    grid.appendChild(btn);
+  });
+}
+
+function openTransactionStep(office){
+  selectedOffice = office; selectedTx = null;
+  document.getElementById("transaction-step").classList.remove("hidden");
+  document.getElementById("tx-office-name").textContent = office.name;
+  const list = document.getElementById("tx-list");
+  list.innerHTML = "";
+  [...office.transactions, { name:"Other", custom:true }].forEach(tx=>{
+    const b = document.createElement("button");
+    b.textContent = tx.custom ? "Other (please specify)" : `${tx.name} (~${tx.mins} min)`;
+    b.onclick = ()=>{
+      selectedTx = tx;
+      const otherWrap = document.getElementById("tx-other-wrap");
+      otherWrap.classList.toggle("hidden", !tx.custom);
+      if(!tx.custom) document.getElementById("tx-other").value = "";
+      updateTxEst();
+      [...list.children].forEach(c=>c.classList.remove("sel"));
+      b.classList.add("sel");
+      checkTxReady();
+    };
+    list.appendChild(b);
+  });
+  updateTxEst();
+  document.getElementById("tx-name").value = "";
+  document.getElementById("tx-other").value = "";
+  document.getElementById("tx-other-wrap").classList.add("hidden");
+  document.getElementById("tx-course").value = "";
+  document.getElementById("tx-year").value = "";
+  document.getElementById("tx-contact").value = "";
+  checkTxReady();
+  document.getElementById("transaction-step").scrollIntoView({behavior:"smooth"});
+}
+function updateTxEst(){
+  const s = state[selectedOffice.id] || emptyOffice();
+  document.getElementById("tx-est").textContent = `${s.queue.length} people currently ahead at this office.`;
+}
+function checkTxReady(){
+  const name = document.getElementById("tx-name").value.trim();
+  const course = document.getElementById("tx-course").value.trim();
+  const otherRequest = document.getElementById("tx-other").value.trim();
+  document.getElementById("tx-confirm").disabled = !(selectedTx && name && course && (!selectedTx.custom || otherRequest));
+}
+
+function escapeHTML(value){
+  return String(value).replace(/[&<>"']/g, character => ({
+    "&":"&amp;", "<":"&lt;", ">":"&gt;", '"':"&quot;", "'":"&#39;"
+  })[character]);
+}
+
+function renderStaff(){
+  const loginBox = document.getElementById("staff-login");
+  const dashBox = document.getElementById("staff-dash");
+  if(!session){ loginBox.classList.remove("hidden"); dashBox.classList.add("hidden"); return; }
+  loginBox.classList.add("hidden"); dashBox.classList.remove("hidden");
+  document.getElementById("dash-office").textContent = session.label;
+  document.getElementById("dash-name").textContent = "Logged in as " + session.role;
+
+  const adminBoard = document.getElementById("admin-board");
+  const singleDash = document.getElementById("single-office-dash");
+
+  if(session.role === "admin"){
+    adminBoard.classList.remove("hidden"); singleDash.classList.add("hidden");
+    adminBoard.innerHTML = "";
+    OFFICES.forEach(o=>{
+      const s = state[o.id] || emptyOffice();
+      const card = document.createElement("div");
+      card.className = "board-card";
+      card.innerHTML = `<div class="office">${o.name}</div><div class="num">${s.nowServing ?? "&mdash;"}</div><div class="waiting">${s.queue.length} waiting</div>`;
+      adminBoard.appendChild(card);
+    });
+    return;
+  }
+
+  adminBoard.classList.add("hidden"); singleDash.classList.remove("hidden");
+  const s = state[session.role] || emptyOffice();
+  document.getElementById("now-num").textContent = s.nowServing ?? "\u2014";
+  document.getElementById("now-tx").innerHTML = s.nowServing
+    ? [escapeHTML(s.nowTx), s.calledAt ? "serving for " + formatElapsed(Date.now() - s.calledAt) : "", s.studentResponse].filter(Boolean).join(" &middot; ")
+    : s.lastCancelled ? `#${s.lastCancelled.number} cancelled by student` : "";
+  const noShowButton = document.getElementById("no-show-notify");
+  const calledLongEnough = s.calledAt && Date.now() - s.calledAt >= CALLED_PROMPT_MS;
+  noShowButton.disabled = !s.nowServing || !calledLongEnough || s.noShowPromptSent;
+  noShowButton.textContent = s.noShowPromptSent
+    ? "Check-in sent"
+    : s.nowServing
+      ? calledLongEnough ? "Student not here? Send check-in" : `Send check-in after ${formatElapsed(CALLED_PROMPT_MS - (Date.now() - s.calledAt))}`
+      : "No student currently called";
+  const list = document.getElementById("wait-list");
+  list.innerHTML = "";
+  if(s.queue.length === 0){
+    list.innerHTML = '<li class="empty">No one waiting.</li>';
+  } else {
+    s.queue.forEach((t,i)=>{
+      const li = document.createElement("li");
+      const waited = t.issuedAt ? formatElapsed(Date.now() - t.issuedAt) : "";
+      li.innerHTML = `<span>#${t.number} &mdash; ${escapeHTML(t.name || "Student")} (${escapeHTML(t.course || "n/a")})<br><small>${escapeHTML(t.tx)} &middot; waiting ${waited}</small></span><span>${i===0 ? "next" : "waiting"}</span>`;
+      list.appendChild(li);
+    });
+  }
+  document.getElementById("call-next").disabled = s.queue.length === 0;
+  document.getElementById("call-batch").disabled = s.queue.length === 0;
+}
+
+function renderDisplay(){
+  const el = document.getElementById("display-board");
+  el.innerHTML = "";
+  OFFICES.forEach(o=>{
+    const s = state[o.id] || emptyOffice();
+    const card = document.createElement("div");
+    card.className = "board-card";
+    card.innerHTML = `<div class="office">${o.name}</div><div class="num">${s.nowServing ?? "&mdash;"}</div><div class="waiting">${s.queue.length} waiting</div>`;
+    el.appendChild(card);
+  });
+}
+
+// ---------------- Actions ----------------
+function getNumber(){
+  if(!selectedOffice || !selectedTx) return;
+  const id = selectedOffice.id;
+  if(!state[id]) state[id] = emptyOffice();
+  const s = state[id];
+  s.lastIssued += 1;
+  const number = s.lastIssued;
+  const name = document.getElementById("tx-name").value.trim();
+  const course = document.getElementById("tx-course").value.trim();
+  const year = document.getElementById("tx-year").value.trim();
+  const contact = document.getElementById("tx-contact").value.trim();
+  const transactionName = selectedTx.custom ? document.getElementById("tx-other").value.trim() : selectedTx.name;
+  if(!transactionName) return;
+  s.queue.push({ number, tx: transactionName, name, course, year, contact, issuedAt: Date.now() });
+  saveState();
+  watchedTicket = { officeId: id, number, officeName: selectedOffice.name,
+    notifiedTurn:false, calledPrompted:false, cancelled:false };
+  saveWatch();
+  document.getElementById("turn-alert").classList.add("hidden");
+  try{ if("Notification" in window && Notification.permission === "default") Notification.requestPermission(); }catch(e){}
+  document.getElementById("transaction-step").classList.add("hidden");
+  const waitEstimate = selectedTx.custom
+    ? `${s.queue.length} ahead including you. Wait time depends on your request.`
+    : `${s.queue.length} ahead including you &middot; est. ~${selectedTx.mins * s.queue.length} min until you're called.`;
+  document.getElementById("ticket-slot").innerHTML = `
+    <div class="ticket">
+      <div class="label">Your number</div>
+      <div class="num">${number}</div>
+      <div class="office">${escapeHTML(selectedOffice.name)} &mdash; ${escapeHTML(transactionName)}</div>
+      <div class="note">${escapeHTML(name)} &middot; ${escapeHTML(course)}${year ? " &middot; " + escapeHTML(year) : ""}</div>
+      <div class="note">${waitEstimate}
+      ${contact ? " We'll text " + escapeHTML(contact) + " when it's almost your turn (feature planned for the real deployment)." : ""}</div>
+      <div class="note">Time issued: ${new Date().toLocaleTimeString([], {hour:"2-digit", minute:"2-digit"})}</div>
+        <div class="note">\uD83D\uDD14 Keep this tab open for your turn alert. If you are not there 30 seconds after being called, office staff can send a check-in asking whether you want to continue or cancel.</div>
+    </div>`;
+}
+
+function callNext(count){
+  if(!session || session.role === "admin") return;
+  const s = state[session.role];
+  if(!s || s.queue.length === 0) return;
+  for(let i=0;i<count && s.queue.length>0;i++){
+    const next = s.queue.shift();
+    s.nowServing = next.number;
+    s.nowTx = next.tx;
+    s.calledAt = Date.now();
+    s.lastCancelled = null;
+    s.noShowPromptSent = false;
+    s.studentResponse = null;
+  }
+  saveState();
+}
+
+function sendNoShowNotification(){
+  if(!session || session.role === "admin") return;
+  const s = state[session.role];
+  if(!s || !s.nowServing || !s.calledAt || s.noShowPromptSent ||
+     Date.now() - s.calledAt < CALLED_PROMPT_MS) return;
+  s.noShowPromptSent = true;
+  s.studentResponse = null;
+  saveState();
+}
+
+function login(){
+  const user = document.getElementById("login-user").value.trim();
+  const pass = document.getElementById("login-pass").value;
+  const match = Object.entries(CREDENTIALS).find(([role, c]) => c.username === user && c.password === pass);
+  const errEl = document.getElementById("login-error");
+  if(!match){ errEl.classList.remove("hidden"); return; }
+  errEl.classList.add("hidden");
+  const [role, c] = match;
+  session = { role, label: c.label };
+  try{ sessionStorage.setItem(SESSION_KEY, JSON.stringify(session)); }catch(e){}
+  render();
+}
+function logout(){
+  session = null;
+  try{ sessionStorage.removeItem(SESSION_KEY); }catch(e){}
+  document.getElementById("login-user").value = "";
+  document.getElementById("login-pass").value = "";
+  render();
+}
+
+// ---------------- Wiring ----------------
+document.querySelectorAll("nav button").forEach(b=>{
+  b.onclick = () => {
+    document.querySelectorAll("nav button").forEach(x=>x.classList.toggle("active", x===b));
+    document.querySelectorAll(".view").forEach(v=>v.classList.toggle("active", v.id === "v-"+b.dataset.view));
+  };
+});
+document.getElementById("student-login-btn").onclick = studentLogin;
+document.getElementById("student-logout-btn").onclick = studentLogout;
+document.getElementById("student-pass").addEventListener("keydown", e => { if(e.key === "Enter") studentLogin(); });
+document.getElementById("tx-name").addEventListener("input", checkTxReady);
+document.getElementById("tx-course").addEventListener("input", checkTxReady);
+document.getElementById("tx-other").addEventListener("input", checkTxReady);
+document.getElementById("tx-back").onclick = () => document.getElementById("transaction-step").classList.add("hidden");
+document.getElementById("tx-confirm").onclick = getNumber;
+document.getElementById("login-btn").onclick = login;
+document.getElementById("logout-btn").onclick = logout;
+document.getElementById("call-next").onclick = () => callNext(1);
+document.getElementById("call-batch").onclick = () => callNext(5);
+document.getElementById("no-show-notify").onclick = sendNoShowNotification;
+document.getElementById("login-pass").addEventListener("keydown", e => { if(e.key === "Enter") login(); });
+
+render();
+
+</script>
+</body>
+</html>
